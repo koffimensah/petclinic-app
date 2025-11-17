@@ -1,0 +1,166 @@
+version: '3.8'
+
+services:
+  # PetClinic Application (DNS/API)
+  petclinic:
+    build:
+      context: .
+      dockerfile: Dockerfile.multi
+    container_name: petclinic-api
+    environment:
+      - SERVER_PORT=8080
+      - MYSQL_URL=jdbc:mysql://mysqlserver:3306/petclinic
+      - SPRING_REDIS_HOST=redis-0
+      - SPRING_REDIS_PORT=6379
+      - SPRING_REDIS_PASSWORD=a-very-complex-password-here
+      - SPRING_REDIS_SENTINEL_MASTER=mymaster
+      - SPRING_REDIS_SENTINEL_NODES=sentinel-0:5000,sentinel-1:5000,sentinel-2:5000
+    ports:
+      - "8000:8000"
+      - "8080:8080"
+    volumes:
+      - ./app:/app
+    depends_on:
+      - mysqlserver
+      - redis-0
+      - redis-1
+      - redis-2
+      - sentinel-0
+      - sentinel-1
+      - sentinel-2
+    networks:
+      - petclinic-network
+    restart: unless-stopped
+
+  # MySQL Database
+  mysqlserver:
+    image: mysql:8
+    container_name: petclinic-mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=
+      - MYSQL_ALLOW_EMPTY_PASSWORD=true
+      - MYSQL_USER=petclinic
+      - MYSQL_PASSWORD=petclinic
+      - MYSQL_DATABASE=petclinic
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - mysql_config:/etc/mysql/conf.d
+    ports:
+      - "3306:3306"
+    networks:
+      - petclinic-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Master (redis-0)
+  redis-0:
+    image: redis:4.0.2
+    container_name: redis-0
+    command: redis-server /etc/redis/redis.conf
+    volumes:
+      - ./redis-0.conf:/etc/redis/redis.conf
+      - redis-0-data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - petclinic-network
+    restart: unless-stopped
+
+  # Redis Slave 1 (redis-1)
+  redis-1:
+    image: redis:4.0.2
+    container_name: redis-1
+    command: redis-server /etc/redis/redis.conf
+    volumes:
+      - ./redis-1.conf:/etc/redis/redis.conf
+      - redis-1-data:/data
+    ports:
+      - "6380:6379"
+    depends_on:
+      - redis-0
+    networks:
+      - petclinic-network
+    restart: unless-stopped
+
+  # Redis Slave 2 (redis-2)
+  redis-2:
+    image: redis:4.0.2
+    container_name: redis-2
+    command: redis-server /etc/redis/redis.conf
+    volumes:
+      - ./redis-2.conf:/etc/redis/redis.conf
+      - redis-2-data:/data
+    ports:
+      - "6381:6379"
+    depends_on:
+      - redis-0
+    networks:
+      - petclinic-network
+    restart: unless-stopped
+
+  # Redis Sentinel 0 (sentinel-0)
+  sentinel-0:
+    image: redis:4.0.2
+    container_name: sentinel-0
+    command: redis-sentinel /etc/redis/sentinel.conf
+    volumes:
+      - ./sentinel-0.conf:/etc/redis/sentinel.conf
+    ports:
+      - "5000:5000"
+    depends_on:
+      - redis-0
+      - redis-1
+      - redis-2
+    networks:
+      - petclinic-network
+    restart: unless-stopped
+
+  # Redis Sentinel 1 (sentinel-1)
+  sentinel-1:
+    image: redis:4.0.2
+    container_name: sentinel-1
+    command: redis-sentinel /etc/redis/sentinel.conf
+    volumes:
+      - ./sentinel-1.conf:/etc/redis/sentinel.conf
+    ports:
+      - "5001:5000"
+    depends_on:
+      - redis-0
+      - redis-1
+      - redis-2
+    networks:
+      - petclinic-network
+    restart: unless-stopped
+
+  # Redis Sentinel 2 (sentinel-2)
+  sentinel-2:
+    image: redis:4.0.2
+    container_name: sentinel-2
+    command: redis-sentinel /etc/redis/sentinel.conf
+    volumes:
+      - ./sentinel-2.conf:/etc/redis/sentinel.conf
+    ports:
+      - "5002:5000"
+    depends_on:
+      - redis-0
+      - redis-1
+      - redis-2
+    networks:
+      - petclinic-network
+    restart: unless-stopped
+
+networks:
+  petclinic-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
+  mysql_config:
+  redis-0-data:
+  redis-1-data:
+  redis-2-data:
+
