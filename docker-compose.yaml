@@ -1,11 +1,12 @@
-version: '3.8'
+# version: '3.8'
 
 services:
   # PetClinic Application (DNS/API)
   petclinic:
-    build:
-      context: .
-      dockerfile: Dockerfile.multi
+    image: koffimensah/petclinic:v1.0
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile.multi
     container_name: petclinic-api
     environment:
       - SERVER_PORT=8080
@@ -17,7 +18,7 @@ services:
       - SPRING_REDIS_SENTINEL_NODES=sentinel-0:5000,sentinel-1:5000,sentinel-2:5000
     ports:
       - "8000:8000"
-      - "8080:8080"
+      - "8081:8080"
     volumes:
       - ./app:/app
     depends_on:
@@ -46,7 +47,7 @@ services:
       - mysql-data:/var/lib/mysql
       - mysql_config:/etc/mysql/conf.d
     ports:
-      - "3306:3306"
+      - "3307:3306"
     networks:
       - petclinic-network
     restart: unless-stopped
