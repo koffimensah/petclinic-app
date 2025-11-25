@@ -43,12 +43,20 @@ jobs:
             sudo apt-get install -y docker-ce docker-ce-cli containerd.io
             echo "✅ Docker installed!"
           fi
-          sudo chmod 777 /var/run/docker.socket
+          
           sudo systemctl enable docker
           sudo systemctl start docker
 
           docker --version
           sudo systemctl status docker --no-pager
+
+      # 3.5️⃣ Fix Docker permissions (avoid permission denied)
+      - name: Fix Docker permissions
+        run: |
+          echo "🔧 Fixing Docker permissions..."
+          sudo usermod -aG docker $USER || true
+          sudo chmod 666 /var/run/docker.sock || true
+          docker info
 
       # 4️⃣ Build JAR with Maven
       - name: Build JAR with Maven
