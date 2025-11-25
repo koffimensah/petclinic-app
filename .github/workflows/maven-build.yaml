@@ -14,7 +14,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2️⃣ Install Maven (if not installed)
+      # 2️⃣ Install Maven
       - name: Install Maven
         run: |
           if ! mvn -v &> /dev/null; then
@@ -23,32 +23,36 @@ jobs:
           fi
           mvn -v
 
-      # 3️⃣ Build JAR with Maven
+      # 3️⃣ Install Docker CE
+      - name: Install Docker
+        run: |
+          if ! command -v docker &> /dev/null; then
+            echo "🔧 Installing Docker..."
+            sudo apt-get update -y
+            sudo apt-get install -y ca-certificates curl gnupg lsb-release
+
+            sudo mkdir -p /etc/apt/keyrings
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+            echo \
+              "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+              $(lsb_release -cs) stable" \
+              | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+            sudo apt-get update -y
+            sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+            echo "✅ Docker installed!"
+          fi
+
+          sudo systemctl enable docker
+          sudo systemctl start docker
+
+          docker --version
+          sudo systemctl status docker --no-pager
+
+      # 4️⃣ Build JAR with Maven
       - name: Build JAR with Maven
         run: mvn clean package -DskipTests
-
-      # 4️⃣ Ensure Docker daemon is running (FIXED VERSION)
-      - name: Ensure Docker daemon is running
-        run: |
-          if ! docker info &> /dev/null; then
-            echo "Docker daemon is not running. Starting..."
-            sudo nohup dockerd \
-              --host=unix:///var/run/docker.sock \
-              --containerd=/run/containerd/containerd.sock \
-              > ~/dockerd.log 2>&1 &
-            sleep 10
-          fi
-
-          # Wait for docker.sock to appear
-          if [ -S /var/run/docker.sock ]; then
-            sudo chmod 777 /var/run/docker.sock
-          else
-            echo "❌ Docker socket not found after startup!"
-            cat ~/dockerd.log
-            exit 1
-          fi
-
-          docker info
 
       # 5️⃣ Login to Docker Hub
       - name: Login to Docker Hub
