@@ -3,7 +3,7 @@ name: Deploy petclinic-app
 on:
   push:
     branches:
-      - "*"
+      - "**"
 
 jobs:
   build-push-deploy:
