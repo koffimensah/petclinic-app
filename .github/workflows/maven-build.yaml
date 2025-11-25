@@ -3,7 +3,7 @@ name: Deploy petclinic-app
 on:
   push:
     branches:
-      - "**"
+      - "**"     # runs on ALL branches
 
 jobs:
   build-push-deploy:
@@ -14,7 +14,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2️⃣ Install Maven (if not already installed on the self-hosted runner)
+      # 2️⃣ Install Maven (if not installed)
       - name: Install Maven
         run: |
           if ! mvn -v &> /dev/null; then
@@ -23,21 +23,31 @@ jobs:
           fi
           mvn -v
 
-      # 3️⃣ Build Spring Boot Petclinic with Maven
+      # 3️⃣ Build JAR with Maven
       - name: Build JAR with Maven
         run: mvn clean package -DskipTests
 
-      # 4️⃣ Ensure Docker daemon is running
+      # 4️⃣ Ensure Docker daemon is running (FIXED VERSION)
       - name: Ensure Docker daemon is running
         run: |
           if ! docker info &> /dev/null; then
             echo "Docker daemon is not running. Starting..."
-            sudo nohup dockerd --host=unix:///var/run/docker.sock \
-              --containerd=/run/containerd/containerd.sock > ~/dockerd.log 2>&1 &
+            sudo nohup dockerd \
+              --host=unix:///var/run/docker.sock \
+              --containerd=/run/containerd/containerd.sock \
+              > ~/dockerd.log 2>&1 &
             sleep 10
           fi
 
-          sudo chmod 777 /var/run/docker.sock
+          # Wait for docker.sock to appear
+          if [ -S /var/run/docker.sock ]; then
+            sudo chmod 777 /var/run/docker.sock
+          else
+            echo "❌ Docker socket not found after startup!"
+            cat ~/dockerd.log
+            exit 1
+          fi
+
           docker info
 
       # 5️⃣ Login to Docker Hub
@@ -49,31 +59,25 @@ jobs:
           echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
           echo "✅ Logged into Docker Hub!"
 
-      # 6️⃣ Build the Docker image using the JAR
+      # 6️⃣ Build Docker image
       - name: Build Docker image
         run: |
           docker build -t petclinic:latest .
 
-      # 7️⃣ Tag image for Docker Hub
+      # 7️⃣ Tag image
       - name: Tag image
         run: |
           docker tag petclinic:latest koffimensah/petclinic:latest
           docker tag petclinic:latest koffimensah/petclinic:v1.0
 
-      # 8️⃣ Push image to Docker Hub
+      # 8️⃣ Push images
       - name: Push Docker images
         run: |
           docker push koffimensah/petclinic:latest
           docker push koffimensah/petclinic:v1.0
 
-      # 9️⃣ Deploy using Docker Compose
+      # 9️⃣ Deploy service
       - name: Deploy petclinic stack
         run: |
           docker compose pull
           docker compose up -d
-
-
-          distribution: 'adopt'
-          cache: maven
-      - name: Build with Maven Wrapper
-        run: ./mvnw -B package
